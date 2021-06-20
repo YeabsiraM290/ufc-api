@@ -1,0 +1,3 @@
+FLASK_DEBUG = True
+SQLALCHEMY_DATABASE_URI = 'sqlite:///./Database/database.db' 
+SQLALCHEMY_TRACK_MODIFICATIONS = False
