@@ -39,3 +39,4 @@ def create():
     db.create_all()
     
 create()
+
