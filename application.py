@@ -8,7 +8,7 @@ from model import *
 from random import randint
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 23 * randint(0, 1000000000000000000)
+# app.config['SECRET_KEY'] = 23 * randint(0, 1000000000000000000)
 app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
 
@@ -47,7 +47,7 @@ class Events(Resource):
                 "div", {
                     "class":
                     "field field--name-node-title field--type-ds field--label-hidden field__item"
-                }).getText()
+                }).text.strip()
             event_image = get_event_data.find("img", {"class": "c-hero__image"})
             event_date = get_event_data.find(
                 "div", {"class": "c-hero__headline-suffix tz-change-inner"})
@@ -70,12 +70,12 @@ class Events(Resource):
                 event_image = ' '
 
             if event_date:
-                event_date = event_date.getText()
+                event_date = event_date.text.strip()
             else:
                 event_date = ' '
 
             if event_location:
-                event_location = event_location.getText()
+                event_location = event_location.text.strip()
             else:
                 event_location = ' '
 
@@ -101,11 +101,11 @@ class Events(Resource):
                     name = fight.find_all(
                         "div", {"class": "c-listing-fight__detail-corner-name"})
                     main_fighters_name.append(
-                        [name[0].getText(), name[1].getText()])
+                        [name[0].text.strip(), name[1].text.strip()])
 
                     fight_class = fight.find("div",
                                             {"class": "c-listing-fight__class"})
-                    main_weight_class.append(fight_class.getText())
+                    main_weight_class.append(fight_class.text.strip())
 
             if prelims_events:
 
@@ -130,11 +130,11 @@ class Events(Resource):
                     name = fight.find_all(
                         "div", {"class": "c-listing-fight__detail-corner-name"})
                     prelims_fighters_name.append(
-                        [name[0].getText(), name[1].getText()])
+                        [name[0].text.strip(), name[1].text.strip()])
 
                     fight_class = fight.find("div",
                                             {"class": "c-listing-fight__class"})
-                    prelims_weight_class.append(fight_class.getText())
+                    prelims_weight_class.append(fight_class.text.strip())
 
             if early_prelims_events:
 
@@ -160,11 +160,11 @@ class Events(Resource):
                     name = fight.find_all(
                         "div", {"class": "c-listing-fight__detail-corner-name"})
                     early_prelims_fighters_name.append(
-                        [name[0].getText(), name[1].getText()])
+                        [name[0].text.strip(), name[1].text.strip()])
 
                     fight_class = fight.find("div",
                                             {"class": "c-listing-fight__class"})
-                    early_prelims_weight_class.append(fight_class.getText())
+                    early_prelims_weight_class.append(fight_class.text.strip())
 
             main_event_fighter_images = []
             prelim_event_fighter_images = []
@@ -219,8 +219,27 @@ class Events(Resource):
 
         return upcoming_event_data
 
+class Stream(Resource):
+
+    def get(self):
+        
+        url = "https://sportsbay.org/competition/ufc"
+        locale_cookie = {"STYXKEY_region": "WORLD.en.Europe/Amsterdam"}
+        source = requests.get(url, cookies=locale_cookie).text
+
+        soup = BeautifulSoup(source, 'lxml')
+        
+        get_stream_url = soup.find("tr", {"class": "vevent"})
+        stream_url = get_stream_url.find_all("td")[-1].find("a")['href']
+
+        get_embed_url = "https://sportsbay.org/embed/"+stream_url[6:-1]
+        
+        return get_embed_url
+        
+
 
 api.add_resource(Events, '/api/upcoming_events')
+api.add_resource(Stream, '/api/upcoming_stream')
 
 if __name__ == "__main__":
     app.run(debug=True)
