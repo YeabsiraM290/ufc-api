@@ -5,6 +5,8 @@ from flask_restful import Api, Resource
 from requests.api import get
 from settings import *
 from random import randint
+import re
+from flask import jsonify
 
 app = Flask(__name__)
 # app.config['SECRET_KEY'] = 23 * randint(0, 1000000000000000000)
@@ -25,9 +27,12 @@ class Events(Resource):
 
         soup = BeautifulSoup(source, 'lxml')
 
-        upcoming_event_bg = soup.find("img", {"class": "c-hero__image"})["src"]
+        upcoming_event_bg = soup.find("div", {"class": "layout__region layout__region--content"})
+       
+        upcoming_event_bg_url = upcoming_event_bg.find("picture").find("img")['src']
+
         upcoming_events = soup.find("details", {"id": "events-list-upcoming"})
-        upcoming_event_data = [[{"Next_event_image": upcoming_event_bg}],[]]
+        upcoming_event_data = [[{"Next_event_image": upcoming_event_bg_url}],[]]
 
         event_links = upcoming_events.find_all(
             "div", {"class": "c-card-event--result__logo"})
@@ -36,6 +41,8 @@ class Events(Resource):
         for link in event_links:
 
             links.append("https://www.ufc.com" + link.find("a", href=True)['href'])
+           
+           
 
         for link in links:
 
@@ -47,7 +54,11 @@ class Events(Resource):
                     "class":
                     "field field--name-node-title field--type-ds field--label-hidden field__item"
                 }).text.strip()
-            event_image = get_event_data.find("img", {"class": "c-hero__image"})
+            event_bg = get_event_data.find("div", {"class": "layout__region layout__region--content"})
+           
+            event_image = event_bg.find("picture")
+          
+            
             event_date = get_event_data.find(
                 "div", {"class": "c-hero__headline-suffix tz-change-inner"})
             event_location = get_event_data.find(
@@ -55,16 +66,16 @@ class Events(Resource):
                     "class":
                     "field field--name-venue field--type-entity-reference field--label-hidden field__item"
                 })
-            main_events = get_event_data.find("details",
-                                            {"id": "edit-group-main-card"})
-            prelims_events = get_event_data.find("details",
-                                                {"id": "edit-group-prelims"})
+            main_events = get_event_data.find("div",
+                                            {"id": "main-card"})
+            prelims_events = get_event_data.find("div",
+                                                {"id": "prelims-card"})
 
             early_prelims_events = get_event_data.find(
-                "details", {"id": "edit-group-early-prelims"})
+                "div", {"id": "early-prelims"})
 
             if event_image:
-                event_image = event_image['src']
+                event_image =  event_image.find("img")["src"]
             else:
                 event_image = ' '
 
@@ -77,15 +88,31 @@ class Events(Resource):
                 event_location = event_location.text.strip()
             else:
                 event_location = ' '
+            
+            main_fighters_name = []
+            main_weight_class = []
+            main_red_corner_img = []
+            main_blue_corner_img = []
+
+            prelims_fighters_name = []
+            prelims_weight_class = []
+            prelims_red_corner_img = []
+            prelims_blue_corner_img = []
+
+            early_prelims_fighters_name = []
+            early_prelims_weight_class = []
+            early_prelims_red_corner_img = []
+            early_prelims_blue_corner_img = []
+           
+            if main_events == None:
+                main_events = get_event_data.find("section", {"class" : "l-listing--stacked--full-width"})
+               
 
             if main_events:
 
                 main_event_fights = main_events.find_all(
                     "div", {"class": "c-listing-fight__content"})
-                main_fighters_name = []
-                main_weight_class = []
-                main_red_corner_img = []
-                main_blue_corner_img = []
+       
 
                 for fight in main_event_fights:
 
@@ -97,21 +124,33 @@ class Events(Resource):
                         "div", {"class": "c-listing-fight__corner-image--blue"})
                     main_blue_corner_img.append(blue_img.find("img")['src'])
 
-                    name = fight.find_all(
-                        "div", {"class": "c-listing-fight__detail-corner-name"})
+                    name = fight.find(
+                        "div", {"class": "c-listing-fight__names-row"})
+                    red_corner_name = name.find("div", {"class": "c-listing-fight__corner-name c-listing-fight__corner-name--red"})
+
+                    try:
+                        red_corner_given_name = red_corner_name.find("span", {"class", "c-listing-fight__corner-given-name"}).text.strip()
+                        red_corner_family_name = red_corner_name.find("span", {"class", "c-listing-fight__corner-family-name"}).text.strip()
+                        red_corner_name = red_corner_given_name + " " + red_corner_family_name
+                    except:
+                        red_corner_name = red_corner_name.text.strip()
+
+                    blue_corner_name = name.find("div", {"class": "c-listing-fight__corner-name c-listing-fight__corner-name--blue"})
+                    try:
+                        blue_corner_given_name = blue_corner_name.find("span", {"class", "c-listing-fight__corner-given-name"}).text.strip()
+                        blue_corner_family_name = blue_corner_name.find("span", {"class", "c-listing-fight__corner-family-name"}).text.strip()
+                        blue_corner_name = blue_corner_given_name + " " + blue_corner_family_name
+                    except:
+                        blue_corner_name = blue_corner_name.text.strip()
+
                     main_fighters_name.append(
-                        [name[0].text.strip(), name[1].text.strip()])
+                        [red_corner_name, blue_corner_name ])
 
                     fight_class = fight.find("div",
                                             {"class": "c-listing-fight__class"})
                     main_weight_class.append(fight_class.text.strip())
 
             if prelims_events:
-
-                prelims_fighters_name = []
-                prelims_weight_class = []
-                prelims_red_corner_img = []
-                prelims_blue_corner_img = []
 
                 prelims_event_fights = prelims_events.find_all(
                     "div", {"class": "c-listing-fight__content"})
@@ -120,27 +159,47 @@ class Events(Resource):
 
                     red_img = fight.find(
                         "div", {"class": "c-listing-fight__corner-image--red"})
+                        
                     prelims_red_corner_img.append(red_img.find("img")['src'])
 
                     blue_img = fight.find(
                         "div", {"class": "c-listing-fight__corner-image--blue"})
                     prelims_blue_corner_img.append(blue_img.find("img")['src'])
 
-                    name = fight.find_all(
-                        "div", {"class": "c-listing-fight__detail-corner-name"})
+                    name = fight.find(
+                        "div", {"class": "details-content__header"})
+
+                    prelims_red_corner_name = name.find("div", {"class": "details-content__name details-content__name--red"})
+
+                    try:
+                        prelims_red_corner_given_name = prelims_red_corner_name.find("span", {"class", "details-content__corner-given-name"}).text.strip()
+                        prelims_red_corner_family_name = prelims_red_corner_name.find("span", {"class", "details-content__corner-family-name"}).text.strip()
+                        prelims_red_corner_name = prelims_red_corner_given_name + " " + prelims_red_corner_family_name
+                    except:
+                        prelims_red_corner_name = prelims_red_corner_name.text.strip()
+
+                    prelims_blue_corner_name = name.find("div", {"class": "details-content__name details-content__name--blue"})
+                  
+
+                    try:
+                        prelims_blue_corner_given_name = prelims_blue_corner_name.find("span", {"class", "details-content__corner-given-name"}).text.strip()
+                        prelims_blue_corner_family_name = prelims_blue_corner_name.find("span", {"class", "details-content__corner-family-name"}).text.strip()
+                        prelims_blue_corner_name = prelims_blue_corner_given_name + " " + prelims_blue_corner_family_name
+                    except:
+                 
+                        prelims_blue_corner_name = prelims_blue_corner_name.text.strip()
+                        
+
                     prelims_fighters_name.append(
-                        [name[0].text.strip(), name[1].text.strip()])
+                        [prelims_red_corner_name,  prelims_blue_corner_name])
 
                     fight_class = fight.find("div",
-                                            {"class": "c-listing-fight__class"})
+                                            {"class": "details-content__class"})
                     prelims_weight_class.append(fight_class.text.strip())
 
             if early_prelims_events:
 
-                early_prelims_fighters_name = []
-                early_prelims_weight_class = []
-                early_prelims_red_corner_img = []
-                early_prelims_blue_corner_img = []
+
 
                 early_prelims_event_fights = early_prelims_events.find_all(
                     "div", {"class": "c-listing-fight__content"})
@@ -156,10 +215,29 @@ class Events(Resource):
                     early_prelims_blue_corner_img.append(
                         blue_img.find("img")['src'])
 
-                    name = fight.find_all(
-                        "div", {"class": "c-listing-fight__detail-corner-name"})
+                    name = fight.find(
+                        "div", {"class": "c-listing-fight__names-row"})
+
+                    early_prelims_red_corner_name = name.find("div", {"class": "c-listing-fight__corner-name c-listing-fight__corner-name--red"})
+
+                    try:
+                        early_prelims_red_corner_given_name = early_prelims_red_corner_name.find("span", {"class", "c-listing-fight__corner-given-name"}).text.strip()
+                        early_prelims_red_corner_family_name = early_prelims_red_corner_name.find("span", {"class", "c-listing-fight__corner-family-name"}).text.strip()
+                        early_prelims_red_corner_name= early_prelims_red_corner_given_name + " " + early_prelims_red_corner_family_name
+                    except:
+                        early_prelims_red_corner_name = early_prelims_red_corner_name.text.strip()
+
+                    early_prelims_blue_corner_name = name.find("div", {"class": "c-listing-fight__corner-name c-listing-fight__corner-name--blue"})
+                    try:
+                        early_prelims_blue_corner_given_name = early_prelims_blue_corner_name.find("span", {"class", "c-listing-fight__corner-given-name"}).text.strip()
+                        early_prelims_blue_corner_family_name = early_prelims_blue_corner_name.find("span", {"class", "c-listing-fight__corner-family-name"}).text.strip()
+                        early_prelims_blue_corner_name = early_prelims_blue_corner_given_name + " " + early_prelims_blue_corner_family_name
+                    except:
+                        early_prelims_blue_corner_name = early_prelims_blue_corner_name.text.strip()
+
                     early_prelims_fighters_name.append(
-                        [name[0].text.strip(), name[1].text.strip()])
+                        [early_prelims_red_corner_name, early_prelims_blue_corner_name ])
+     
 
                     fight_class = fight.find("div",
                                             {"class": "c-listing-fight__class"})
@@ -216,7 +294,7 @@ class Events(Resource):
 
             upcoming_event_data[1].append(event_data)
 
-        return upcoming_event_data
+        return jsonify(upcoming_event_data)
 
 class Stream(Resource):
 
