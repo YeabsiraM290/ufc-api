@@ -314,4 +314,4 @@ api.add_resource(Events, '/api/upcoming_events')
 api.add_resource(Stream, '/api/upcoming_stream')
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
