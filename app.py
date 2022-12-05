@@ -1,11 +1,8 @@
-from flask import Flask, render_template, url_for
+from flask import Flask
 from bs4 import BeautifulSoup
 import requests
 from flask_restful import Api, Resource
-from requests.api import get
 from settings import *
-from random import randint
-import re
 from flask import jsonify
 
 app = Flask(__name__)
